@@ -64,7 +64,6 @@ HTML = """
         }
         h1 {
             text-align: center;
-            margin-top: 20px;
         }
         form {
             display: flex;
