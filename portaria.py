@@ -1,11 +1,16 @@
+import datetime
+
+registros = []
+
 """
 Sistema de Portaria WEB (Flask + SQLite)
-Interface moderna + correções de execução
+Interface moderna + botão de excluir
 """
 
 from flask import Flask, render_template_string, request, redirect
 from datetime import datetime
 import sqlite3
+import os
 
 app = Flask(__name__)
 
@@ -38,7 +43,7 @@ def criar_tabela():
 
 
 # ----------------------
-# HTML
+# HTML MODERNO
 # ----------------------
 
 HTML = """
@@ -87,6 +92,10 @@ HTML = """
             background: #f44336;
             color: white;
         }
+        .excluir {
+            background: #ff9800;
+            color: white;
+        }
         table {
             width: 100%;
             border-collapse: collapse;
@@ -125,7 +134,7 @@ HTML = """
             <th>Placa</th>
             <th>Entrada</th>
             <th>Saída</th>
-            <th>Ação</th>
+            <th>Ações</th>
         </tr>
         {% for v in registros %}
         <tr>
@@ -136,12 +145,16 @@ HTML = """
             <td>{{v[6]}}</td>
             <td>
                 {% if not v[6] %}
-                <form method="POST" action="/saida/{{v[0]}}">
+                <form method="POST" action="/saida/{{v[0]}}" style="display:inline;">
                     <button class="saida">Saída</button>
                 </form>
                 {% else %}
                 ✔️
                 {% endif %}
+
+                <form method="POST" action="/excluir/{{v[0]}}" style="display:inline;">
+                    <button class="excluir">Excluir</button>
+                </form>
             </td>
         </tr>
         {% endfor %}
@@ -209,8 +222,24 @@ def saida(id):
     return redirect("/")
 
 
+@app.route("/excluir/<int:id>", methods=["POST"])
+def excluir(id):
+    conn = conectar()
+    cursor = conn.cursor()
+
+    cursor.execute("DELETE FROM visitantes WHERE id = ?", (id,))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
+
 # ----------------------
-# INICIALIZAÇÃO
+# EXECUÇÃO
 # ----------------------
 
-criar_tabela()
+if __name__ == "__main__":
+    criar_tabela()
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
