@@ -1,8 +1,4 @@
-import datetime
-
-registros = []
-
-""
+"""
 Sistema de Portaria WEB (Flask + SQLite)
 Interface moderna + correções de execução
 """
@@ -10,7 +6,6 @@ Interface moderna + correções de execução
 from flask import Flask, render_template_string, request, redirect
 from datetime import datetime
 import sqlite3
-import os
 
 app = Flask(__name__)
 
@@ -43,7 +38,7 @@ def criar_tabela():
 
 
 # ----------------------
-# HTML MODERNO
+# HTML
 # ----------------------
 
 HTML = """
@@ -68,7 +63,7 @@ HTML = """
         form {
             display: flex;
             flex-wrap: wrap;
-            gap: 
+            gap: 10px;
             justify-content: center;
             margin-bottom: 20px;
         }
@@ -215,76 +210,7 @@ def saida(id):
 
 
 # ----------------------
-# TESTES
+# INICIALIZAÇÃO
 # ----------------------
 
-def _test_db():
-    criar_tabela()
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM visitantes")
-
-    cursor.execute("""
-    INSERT INTO visitantes (nome, endereco, documento, placa, entrada, saida)
-    VALUES ('Teste', 'Rua', '123', 'ABC', '01/01', '')
-    """)
-
-    conn.commit()
-
-    cursor.execute("SELECT * FROM visitantes")
-    dados = cursor.fetchall()
-
-    assert len(dados) == 1
-
-    conn.close()
-
-
-def _test_saida_update():
-    criar_tabela()
-    conn = conectar()
-    cursor = conn.cursor()
-
-    cursor.execute("DELETE FROM visitantes")
-
-    cursor.execute("""
-    INSERT INTO visitantes (nome, endereco, documento, placa, entrada, saida)
-    VALUES ('Teste2', 'Rua', '999', 'XYZ', '01/01', '')
-    """)
-
-    conn.commit()
-
-    cursor.execute("UPDATE visitantes SET saida = '02/01' WHERE nome = 'Teste2'")
-    conn.commit()
-
-    cursor.execute("SELECT saida FROM visitantes WHERE nome = 'Teste2'")
-    saida = cursor.fetchone()[0]
-
-    assert saida != ""
-
-    conn.close()
-
-
-# ----------------------
-# EXECUÇÃO
-# ----------------------
-
-def iniciar_servidor():
-    port = int(os.environ.get("PORT", 5000))
-
-    try:
-        app.run(host="0.0.0.0", port=port, debug=False, use_reloader=False)
-    except OSError:
-        print(f"Porta {port} ocupada. Tentando 5001...")
-        app.run(host="0.0.0.0", port=5001, debug=False, use_reloader=False)
-
-
-if __name__ == "__main__":
-    criar_tabela()
-    _test_db()
-    _test_saida_update()
-
-    try:
-        iniciar_servidor()
-    except SystemExit:
-        print("Servidor não pôde iniciar neste ambiente.")
+criar_tabela()
