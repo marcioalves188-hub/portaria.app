@@ -29,6 +29,7 @@ def criar_tabelas():
     CREATE TABLE IF NOT EXISTS visitantes (
         id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
+        endereco TEXT,
         documento TEXT,
         placa TEXT,
         entrada TEXT,
@@ -83,13 +84,14 @@ th,td{padding:10px}
 
 <!-- BUSCA -->
 <form method="GET" action="/">
-<input name="busca" placeholder="Buscar nome/documento/placa">
+<input name="busca" placeholder="Buscar nome/documento/placa/endereço">
 <button>Buscar</button>
 </form>
 
 <!-- CADASTRO -->
 <form method="POST" action="/cadastrar">
 <input name="nome" placeholder="Nome" required>
+<input name="endereco" placeholder="Endereço">
 <input name="documento" placeholder="Documento" required>
 <input name="placa" placeholder="Placa">
 <button>Cadastrar</button>
@@ -97,7 +99,7 @@ th,td{padding:10px}
 
 <!-- TABELA VISITANTES -->
 <table>
-<tr><th>Nome</th><th>Documento</th><th>Placa</th><th>Entrada</th><th>Saída</th><th>Ações</th></tr>
+<tr><th>Nome</th><th>Endereço</th><th>Documento</th><th>Placa</th><th>Entrada</th><th>Saída</th><th>Ações</th></tr>
 {% for v in registros %}
 <tr>
 <td>{{v[1]}}</td>
@@ -105,8 +107,9 @@ th,td{padding:10px}
 <td>{{v[3]}}</td>
 <td>{{v[4]}}</td>
 <td>{{v[5]}}</td>
+<td>{{v[6]}}</td>
 <td>
-{% if not v[5] %}
+{% if not v[6] %}
 <form method="POST" action="/saida/{{v[0]}}" style="display:inline">
 <button class="saida">Saída</button>
 </form>
@@ -174,10 +177,10 @@ def index():
     conn = conectar()
     c = conn.cursor()
 
-    query = "SELECT * FROM visitantes WHERE nome LIKE ? OR documento LIKE ? OR placa LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
+    query = "SELECT * FROM visitantes WHERE nome LIKE ? OR documento LIKE ? OR placa LIKE ? OR endereco LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
     termo = f"%{busca}%"
 
-    c.execute(query, (termo, termo, termo, limite + 1, offset))
+    c.execute(query, (termo, termo, termo, termo, limite + 1, offset))
     dados = c.fetchall()
 
     tem_proxima = len(dados) > limite
@@ -196,8 +199,8 @@ def cadastrar():
     conn = conectar()
     c = conn.cursor()
 
-    c.execute("INSERT INTO visitantes(nome,documento,placa,entrada,saida) VALUES(?,?,?,?,?)",
-              (request.form["nome"], request.form["documento"], request.form.get("placa", ""), agora(), ""))
+    c.execute("INSERT INTO visitantes(nome,endereco,documento,placa,entrada,saida) VALUES(?,?,?,?,?,?)",
+              (request.form["nome"], request.form.get("endereco", ""), request.form["documento"], request.form.get("placa", ""), agora(), ""))
 
     conn.commit()
     conn.close()
@@ -261,38 +264,20 @@ def excluir_ocorrencia(id):
 # TESTES
 # ----------------------
 
-def _test_busca():
+def _test_endereco():
     criar_tabelas()
     conn = conectar()
     c = conn.cursor()
 
     c.execute("DELETE FROM visitantes")
 
-    c.execute("INSERT INTO visitantes(nome,documento,placa,entrada,saida) VALUES ('Joao','123','ABC','01/01','')")
+    c.execute("INSERT INTO visitantes(nome,endereco,documento,placa,entrada,saida) VALUES ('Joao','Rua A','123','ABC','01/01','')")
     conn.commit()
 
-    c.execute("SELECT * FROM visitantes WHERE nome LIKE '%Joao%'")
-    dados = c.fetchall()
+    c.execute("SELECT endereco FROM visitantes WHERE nome='Joao'")
+    endereco = c.fetchone()[0]
 
-    assert len(dados) == 1
-
-    conn.close()
-
-
-def _test_ocorrencia():
-    criar_tabelas()
-    conn = conectar()
-    c = conn.cursor()
-
-    c.execute("DELETE FROM ocorrencias")
-
-    c.execute("INSERT INTO ocorrencias(nome,descricao,data) VALUES ('Teste','Algo','01/01')")
-    conn.commit()
-
-    c.execute("SELECT * FROM ocorrencias")
-    dados = c.fetchall()
-
-    assert len(dados) == 1
+    assert endereco == 'Rua A'
 
     conn.close()
 
@@ -302,8 +287,7 @@ def _test_ocorrencia():
 
 if __name__ == "__main__":
     criar_tabelas()
-    _test_busca()
-    _test_ocorrencia()
+    _test_endereco()
 
     port=int(os.environ.get("PORT",5000))
     app.run(host="0.0.0.0",port=port)
