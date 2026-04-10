@@ -1,7 +1,7 @@
 import datetime
 
 """
-Portaria parque das Rosas WEB (Flask + SQLite)
+Portaria Parque das Rosas Parque das Rosas WEB (Flask + SQLite)
 VERSÃO PROFISSIONAL (PWA + BUSCA + HORÁRIO AJUSTADO)
 """
 
@@ -59,7 +59,7 @@ HTML = """
 <!DOCTYPE html>
 <html>
 <head>
-    <title>Portaria</title>
+    <title>Portaria Parque das Rosas</title>
 
     <link rel="manifest" href="/manifest.json">
     <meta name="theme-color" content="#1e1e2f">
@@ -90,10 +90,10 @@ HTML = """
 </head>
 <body>
 
-<div id="splash">🚪 Portaria</div>
+<div id="splash">🚪 Portaria Parque das Rosas</div>
 
 <div class="container">
-    <h1>🚪 Sistema de Portaria</h1>
+    <h1>🚪 Portaria Parque das Rosas Parque das Rosas</h1>
 
     <!-- BUSCA -->
     <form method="GET" action="/">
