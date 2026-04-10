@@ -2,7 +2,7 @@ import datetime
 
 """
 Portaria Parque das Rosas WEB (Flask + SQLite)
-VERSÃO ONLINE SIMPLES (SEM OFFLINE)
+VERSÃO ONLINE SIMPLES
 """
 
 from flask import Flask, render_template_string, request, redirect
@@ -61,6 +61,7 @@ HTML = """
 body{font-family:Arial;background:#1e1e2f;color:white;text-align:center}
 input,button{padding:10px;border-radius:8px;border:none;margin:5px}
 button{background:#4CAF50;color:white}
+.delete{background:#f44336}
 table{width:100%;margin-top:20px;background:#2e2e3e}
 th,td{padding:10px}
 </style>
@@ -72,17 +73,24 @@ th,td{padding:10px}
 <form method="POST" action="/cadastrar">
 <input name="nome" placeholder="Nome" required>
 <input name="documento" placeholder="Documento" required>
+<input name="placa" placeholder="Placa do veículo">
 <button>Cadastrar</button>
 </form>
 
 <table>
-<tr><th>Nome</th><th>Documento</th><th>Entrada</th><th>Saída</th></tr>
+<tr><th>Nome</th><th>Documento</th><th>Placa</th><th>Entrada</th><th>Saída</th><th>Ação</th></tr>
 {% for v in registros %}
 <tr>
 <td>{{v[1]}}</td>
 <td>{{v[3]}}</td>
+<td>{{v[4]}}</td>
 <td>{{v[5]}}</td>
 <td>{{v[6]}}</td>
+<td>
+<form method="POST" action="/excluir/{{v[0]}}">
+<button class="delete">Excluir</button>
+</form>
+</td>
 </tr>
 {% endfor %}
 </table>
@@ -112,14 +120,28 @@ def cadastrar():
     c = conn.cursor()
 
     c.execute("""
-    INSERT INTO visitantes(nome,documento,entrada,saida)
-    VALUES(?,?,?,?)
+    INSERT INTO visitantes(nome,documento,placa,entrada,saida)
+    VALUES(?,?,?,?,?)
     """, (
         request.form["nome"],
         request.form["documento"],
+        request.form.get("placa", ""),
         agora(),
         ""
     ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
+
+@app.route("/excluir/<int:id>", methods=["POST"])
+def excluir(id):
+    conn = conectar()
+    c = conn.cursor()
+
+    c.execute("DELETE FROM visitantes WHERE id = ?", (id,))
 
     conn.commit()
     conn.close()
@@ -137,13 +159,38 @@ def _test_insert():
 
     c.execute("DELETE FROM visitantes")
 
-    c.execute("INSERT INTO visitantes(nome,documento,entrada,saida) VALUES ('Teste','123','01/01','')")
+    c.execute("INSERT INTO visitantes(nome,documento,placa,entrada,saida) VALUES ('Teste','123','ABC','01/01','')")
     conn.commit()
 
     c.execute("SELECT * FROM visitantes")
     dados = c.fetchall()
 
     assert len(dados) == 1
+    assert dados[0][4] == 'ABC'
+
+    conn.close()
+
+
+def _test_delete():
+    criar_tabelas()
+    conn = conectar()
+    c = conn.cursor()
+
+    c.execute("DELETE FROM visitantes")
+
+    c.execute("INSERT INTO visitantes(nome,documento,placa,entrada,saida) VALUES ('Teste','123','ABC','01/01','')")
+    conn.commit()
+
+    c.execute("SELECT id FROM visitantes")
+    vid = c.fetchone()[0]
+
+    c.execute("DELETE FROM visitantes WHERE id = ?", (vid,))
+    conn.commit()
+
+    c.execute("SELECT * FROM visitantes")
+    dados = c.fetchall()
+
+    assert len(dados) == 0
 
     conn.close()
 
@@ -154,6 +201,7 @@ def _test_insert():
 if __name__ == "__main__":
     criar_tabelas()
     _test_insert()
+    _test_delete()
 
     port=int(os.environ.get("PORT",5000))
     app.run(host="0.0.0.0",port=port)
