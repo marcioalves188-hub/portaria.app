@@ -2,7 +2,7 @@ import datetime
 
 """
 Sistema de Portaria WEB (Flask + SQLite)
-VERSÃO PROFISSIONAL (PWA + OFFLINE + SPLASH)
+VERSÃO PROFISSIONAL (PWA + BUSCA + HORÁRIO AJUSTADO)
 """
 
 from flask import Flask, render_template_string, request, redirect, send_file
@@ -41,6 +41,14 @@ def criar_tabela():
 
 
 # ----------------------
+# FUNÇÃO HORÁRIO LOCAL
+# ----------------------
+
+def agora():
+    return datetime.now().strftime("%d/%m/%Y %H:%M")
+
+
+# ----------------------
 # HTML PROFISSIONAL
 # ----------------------
 
@@ -54,66 +62,26 @@ HTML = """
     <meta name="theme-color" content="#1e1e2f">
 
     <style>
-        body {
-            font-family: Arial;
-            background: #1e1e2f;
-            color: white;
-            margin: 0;
-        }
-        .container {
-            width: 90%;
-            margin: auto;
-        }
-        h1 {
-            text-align: center;
-        }
-        form {
-            display: flex;
-            flex-wrap: wrap;
-            gap: 10px;
-            justify-content: center;
-            margin-bottom: 20px;
-        }
-        input {
-            padding: 10px;
-            border-radius: 8px;
-            border: none;
-            width: 180px;
-        }
-        button {
-            padding: 10px 15px;
-            border: none;
-            border-radius: 8px;
-            cursor: pointer;
-        }
+        body { font-family: Arial; background: #1e1e2f; color: white; margin: 0; }
+        .container { width: 90%; margin: auto; }
+        h1 { text-align: center; }
+        form { display: flex; flex-wrap: wrap; gap: 10px; justify-content: center; margin-bottom: 20px; }
+        input { padding: 10px; border-radius: 8px; border: none; }
+        button { padding: 10px 15px; border: none; border-radius: 8px; cursor: pointer; }
         .entrada { background: #4CAF50; }
         .saida { background: #f44336; }
         .excluir { background: #ff9800; }
+        .buscar { background: #2196F3; }
 
-        table {
-            width: 100%;
-            border-collapse: collapse;
-            background: #2e2e3e;
-            border-radius: 10px;
-            overflow: hidden;
-        }
-        th, td {
-            padding: 12px;
-            text-align: center;
-        }
+        table { width: 100%; border-collapse: collapse; background: #2e2e3e; border-radius: 10px; overflow: hidden; }
+        th, td { padding: 12px; text-align: center; }
         th { background: #333; }
         tr:nth-child(even) { background: #3a3a4f; }
 
         #splash {
-            position: fixed;
-            width: 100%;
-            height: 100%;
-            background: #1e1e2f;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            font-size: 24px;
-            z-index: 9999;
+            position: fixed; width: 100%; height: 100%; background: #1e1e2f;
+            display: flex; justify-content: center; align-items: center;
+            font-size: 24px; z-index: 9999;
         }
     </style>
 </head>
@@ -124,6 +92,13 @@ HTML = """
 <div class="container">
     <h1>🚪 Sistema de Portaria</h1>
 
+    <!-- BUSCA -->
+    <form method="GET" action="/">
+        <input name="q" placeholder="Buscar nome, documento ou placa" value="{{busca}}">
+        <button class="buscar">Buscar</button>
+    </form>
+
+    <!-- CADASTRO -->
     <form method="POST" action="/cadastrar">
         <input name="nome" placeholder="Nome" required>
         <input name="endereco" placeholder="Endereço">
@@ -165,15 +140,8 @@ HTML = """
 </div>
 
 <script>
-// Splash
-window.onload = () => {
-  document.getElementById("splash").style.display = "none";
-};
-
-// Service Worker
-if ('serviceWorker' in navigator) {
-  navigator.serviceWorker.register('/static/sw.js');
-}
+window.onload = () => { document.getElementById("splash").style.display = "none"; };
+if ('serviceWorker' in navigator) { navigator.serviceWorker.register('/static/sw.js'); }
 </script>
 
 </body>
@@ -186,13 +154,23 @@ if ('serviceWorker' in navigator) {
 
 @app.route("/")
 def index():
+    busca = request.args.get("q", "")
+
     conn = conectar()
     cursor = conn.cursor()
-    cursor.execute("SELECT * FROM visitantes")
+
+    if busca:
+        cursor.execute("""
+        SELECT * FROM visitantes
+        WHERE nome LIKE ? OR documento LIKE ? OR placa LIKE ?
+        """, (f"%{busca}%", f"%{busca}%", f"%{busca}%"))
+    else:
+        cursor.execute("SELECT * FROM visitantes")
+
     registros = cursor.fetchall()
     conn.close()
 
-    return render_template_string(HTML, registros=registros)
+    return render_template_string(HTML, registros=registros, busca=busca)
 
 
 @app.route("/cadastrar", methods=["POST"])
@@ -208,7 +186,7 @@ def cadastrar():
         request.form["endereco"],
         request.form["documento"],
         request.form["placa"],
-        datetime.now().strftime("%d/%m/%Y %H:%M"),
+        agora(),
         ""
     ))
 
@@ -227,10 +205,7 @@ def saida(id):
     UPDATE visitantes
     SET saida = ?
     WHERE id = ? AND saida = ''
-    """, (
-        datetime.now().strftime("%d/%m/%Y %H:%M"),
-        id
-    ))
+    """, (agora(), id))
 
     conn.commit()
     conn.close()
