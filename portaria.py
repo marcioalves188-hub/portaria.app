@@ -79,6 +79,8 @@ button{padding:10px 15px;border:none;border-radius:8px;cursor:pointer}
 .buscar{background:#2196F3}
 .ocorrencia{background:#9C27B0}
 
+.excluir-oc{background:#e91e63}
+
 table{width:100%;border-collapse:collapse;background:#2e2e3e}
 th,td{padding:10px;text-align:center}
 th{background:#333}
@@ -173,12 +175,18 @@ Página {{pagina}}
 <tr>
 <th>Data</th>
 <th>Descrição</th>
+<th>Ação</th>
 </tr>
 
 {% for o in ocorrencias %}
 <tr>
 <td>{{o[1]}}</td>
 <td>{{o[2]}}</td>
+<td>
+<form method="POST" action="/excluir_ocorrencia/{{o[0]}}" onsubmit="return confirm('Excluir ocorrência?')">
+<button class="excluir-oc">Excluir</button>
+</form>
+</td>
 </tr>
 {% endfor %}
 
@@ -288,6 +296,20 @@ def ocorrencia():
         agora(),
         request.form["descricao"]
     ))
+
+    conn.commit()
+    conn.close()
+
+    return redirect("/")
+
+
+@app.route("/excluir_ocorrencia/<int:id>",methods=["POST"])
+def excluir_ocorrencia(id):
+
+    conn=conectar()
+    cursor=conn.cursor()
+
+    cursor.execute("DELETE FROM ocorrencias WHERE id=?",(id,))
 
     conn.commit()
     conn.close()
