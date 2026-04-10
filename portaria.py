@@ -93,7 +93,7 @@ HTML = """
 <div id="splash">🚪 Portaria Parque das Rosas</div>
 
 <div class="container">
-    <h1>🚪 Portaria Parque das Rosas Parque das Rosas</h1>
+    <h1>🚪 Portaria Parque das Rosas</h1>
 
     <!-- BUSCA -->
     <form method="GET" action="/">
