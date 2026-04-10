@@ -13,6 +13,11 @@ import sqlite3
 import os
 
 app = Flask(__name__)
+from flask import send_file
+
+@app.route("/manifest.json")
+def manifest():
+    return send_file("manifest.json")
 
 # ----------------------
 # BANCO DE DADOS
@@ -162,6 +167,8 @@ HTML = """
 </div>
 </body>
 </html>
+<link rel="manifest" href="/manifest.json">
+<meta name="theme-color" content="#1e1e2f">
 """
 
 # ----------------------
