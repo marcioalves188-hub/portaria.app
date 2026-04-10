@@ -1,7 +1,7 @@
 import datetime
 
 """
-Portaria Parque das Rosas Parque das Rosas WEB (Flask + SQLite)
+Portaria Parque das Rosas WEB (Flask + SQLite)
 VERSÃO PROFISSIONAL (PWA + BUSCA + HORÁRIO AJUSTADO)
 """
 
