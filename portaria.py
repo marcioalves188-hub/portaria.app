@@ -44,8 +44,11 @@ def criar_tabela():
 # FUNÇÃO HORÁRIO LOCAL
 # ----------------------
 
+from zoneinfo import ZoneInfo
+
 def agora():
-    return datetime.now().strftime("%d/%m/%Y %H:%M")
+    # Ajuste para horário do Brasil
+    return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
 
 
 # ----------------------
