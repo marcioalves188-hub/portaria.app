@@ -2,31 +2,16 @@ import datetime
 
 """
 Portaria Parque das Rosas WEB (Flask + SQLite)
-OFFLINE COMPLETO (SALVA SEM INTERNET + SINCRONIZA)
+VERSÃO ONLINE SIMPLES (SEM OFFLINE)
 """
 
-from flask import Flask, render_template_string, request, redirect, send_file, jsonify
+from flask import Flask, render_template_string, request, redirect
 from datetime import datetime
 import sqlite3
 import os
 from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
-
-# ----------------------
-# STATIC + SERVICE WORKER
-# ----------------------
-
-if not os.path.exists('static'):
-    os.makedirs('static')
-
-sw_path = os.path.join('static','sw.js')
-if not os.path.exists(sw_path):
-    with open(sw_path,'w') as f:
-        f.write("""
-self.addEventListener('install', e => self.skipWaiting());
-self.addEventListener('fetch', () => {});
-""")
 
 # ----------------------
 # BANCO
@@ -52,14 +37,6 @@ def criar_tabelas():
     )
     """)
 
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS ocorrencias (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        data TEXT,
-        descricao TEXT
-    )
-    """)
-
     conn.commit()
     conn.close()
 
@@ -71,7 +48,7 @@ def agora():
     return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
 
 # ----------------------
-# HTML COM OFFLINE
+# HTML
 # ----------------------
 
 HTML = """
@@ -79,76 +56,37 @@ HTML = """
 <html>
 <head>
 <title>Portaria Parque das Rosas</title>
-<meta name="theme-color" content="#1e1e2f">
+<meta name="viewport" content="width=device-width, initial-scale=1">
 <style>
-body{font-family:Arial;background:#1e1e2f;color:white}
-button{padding:10px;border-radius:8px;border:none}
-input,textarea{padding:10px;border-radius:8px;border:none}
+body{font-family:Arial;background:#1e1e2f;color:white;text-align:center}
+input,button{padding:10px;border-radius:8px;border:none;margin:5px}
+button{background:#4CAF50;color:white}
+table{width:100%;margin-top:20px;background:#2e2e3e}
+th,td{padding:10px}
 </style>
 </head>
 <body>
+
 <h1>🚪 Portaria Parque das Rosas</h1>
 
-<form id="formCadastro">
+<form method="POST" action="/cadastrar">
 <input name="nome" placeholder="Nome" required>
 <input name="documento" placeholder="Documento" required>
 <button>Cadastrar</button>
 </form>
 
-<h3 id="status"></h3>
+<table>
+<tr><th>Nome</th><th>Documento</th><th>Entrada</th><th>Saída</th></tr>
+{% for v in registros %}
+<tr>
+<td>{{v[1]}}</td>
+<td>{{v[3]}}</td>
+<td>{{v[5]}}</td>
+<td>{{v[6]}}</td>
+</tr>
+{% endfor %}
+</table>
 
-<script>
-
-// FILA OFFLINE
-function salvarOffline(tipo,dados){
-    let fila = JSON.parse(localStorage.getItem("fila") || "[]");
-    fila.push({tipo,dados});
-    localStorage.setItem("fila", JSON.stringify(fila));
-}
-
-// ENVIAR FILA
-async function sincronizar(){
-    let fila = JSON.parse(localStorage.getItem("fila") || "[]");
-
-    if(fila.length===0) return;
-
-    for(let item of fila){
-        await fetch("/sync",{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify(item)
-        });
-    }
-
-    localStorage.removeItem("fila");
-}
-
-// DETECTAR ONLINE
-window.addEventListener("online", sincronizar);
-
-// CADASTRO
-
-document.getElementById("formCadastro").onsubmit = async (e)=>{
-    e.preventDefault();
-
-    let dados = Object.fromEntries(new FormData(e.target));
-
-    if(navigator.onLine){
-        await fetch("/sync",{
-            method:"POST",
-            headers:{"Content-Type":"application/json"},
-            body:JSON.stringify({tipo:"cadastro",dados})
-        });
-        document.getElementById("status").innerText = "✅ Enviado";
-    }else{
-        salvarOffline("cadastro",dados);
-        document.getElementById("status").innerText = "📴 Salvo offline";
-    }
-
-    e.target.reset();
-};
-
-</script>
 </body>
 </html>
 """
@@ -159,33 +97,55 @@ document.getElementById("formCadastro").onsubmit = async (e)=>{
 
 @app.route("/")
 def index():
-    return render_template_string(HTML)
+    conn = conectar()
+    c = conn.cursor()
+    c.execute("SELECT * FROM visitantes")
+    registros = c.fetchall()
+    conn.close()
+
+    return render_template_string(HTML, registros=registros)
 
 
-@app.route("/sync", methods=["POST"])
-def sync():
-
-    data = request.get_json()
-
+@app.route("/cadastrar", methods=["POST"])
+def cadastrar():
     conn = conectar()
     c = conn.cursor()
 
-    if data["tipo"] == "cadastro":
-        d = data["dados"]
-        c.execute("""
-        INSERT INTO visitantes(nome,documento,entrada,saida)
-        VALUES(?,?,?,?)
-        """,(d.get("nome"), d.get("documento"), agora(), ""))
+    c.execute("""
+    INSERT INTO visitantes(nome,documento,entrada,saida)
+    VALUES(?,?,?,?)
+    """, (
+        request.form["nome"],
+        request.form["documento"],
+        agora(),
+        ""
+    ))
 
     conn.commit()
     conn.close()
 
-    return jsonify({"status":"ok"})
+    return redirect("/")
 
+# ----------------------
+# TESTES
+# ----------------------
 
-@app.route("/manifest.json")
-def manifest():
-    return send_file("manifest.json")
+def _test_insert():
+    criar_tabelas()
+    conn = conectar()
+    c = conn.cursor()
+
+    c.execute("DELETE FROM visitantes")
+
+    c.execute("INSERT INTO visitantes(nome,documento,entrada,saida) VALUES ('Teste','123','01/01','')")
+    conn.commit()
+
+    c.execute("SELECT * FROM visitantes")
+    dados = c.fetchall()
+
+    assert len(dados) == 1
+
+    conn.close()
 
 # ----------------------
 # EXECUÇÃO
@@ -193,5 +153,7 @@ def manifest():
 
 if __name__ == "__main__":
     criar_tabelas()
+    _test_insert()
+
     port=int(os.environ.get("PORT",5000))
     app.run(host="0.0.0.0",port=port)
