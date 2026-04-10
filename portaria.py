@@ -1,23 +1,16 @@
 import datetime
 
-registros = []
-
 """
 Sistema de Portaria WEB (Flask + SQLite)
-Interface moderna + botão de excluir
+VERSÃO PROFISSIONAL (PWA + OFFLINE + SPLASH)
 """
 
-from flask import Flask, render_template_string, request, redirect
+from flask import Flask, render_template_string, request, redirect, send_file
 from datetime import datetime
 import sqlite3
 import os
 
 app = Flask(__name__)
-from flask import send_file
-
-@app.route("/manifest.json")
-def manifest():
-    return send_file("manifest.json")
 
 # ----------------------
 # BANCO DE DADOS
@@ -48,7 +41,7 @@ def criar_tabela():
 
 
 # ----------------------
-# HTML MODERNO
+# HTML PROFISSIONAL
 # ----------------------
 
 HTML = """
@@ -56,6 +49,10 @@ HTML = """
 <html>
 <head>
     <title>Portaria</title>
+
+    <link rel="manifest" href="/manifest.json">
+    <meta name="theme-color" content="#1e1e2f">
+
     <style>
         body {
             font-family: Arial;
@@ -89,18 +86,10 @@ HTML = """
             border-radius: 8px;
             cursor: pointer;
         }
-        .entrada {
-            background: #4CAF50;
-            color: white;
-        }
-        .saida {
-            background: #f44336;
-            color: white;
-        }
-        .excluir {
-            background: #ff9800;
-            color: white;
-        }
+        .entrada { background: #4CAF50; }
+        .saida { background: #f44336; }
+        .excluir { background: #ff9800; }
+
         table {
             width: 100%;
             border-collapse: collapse;
@@ -112,15 +101,26 @@ HTML = """
             padding: 12px;
             text-align: center;
         }
-        th {
-            background: #333;
-        }
-        tr:nth-child(even) {
-            background: #3a3a4f;
+        th { background: #333; }
+        tr:nth-child(even) { background: #3a3a4f; }
+
+        #splash {
+            position: fixed;
+            width: 100%;
+            height: 100%;
+            background: #1e1e2f;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            font-size: 24px;
+            z-index: 9999;
         }
     </style>
 </head>
 <body>
+
+<div id="splash">🚪 Portaria</div>
+
 <div class="container">
     <h1>🚪 Sistema de Portaria</h1>
 
@@ -153,11 +153,9 @@ HTML = """
                 <form method="POST" action="/saida/{{v[0]}}" style="display:inline;">
                     <button class="saida">Saída</button>
                 </form>
-                {% else %}
-                ✔️
                 {% endif %}
 
-                <form method="POST" action="/excluir/{{v[0]}}" style="display:inline;">
+                <form method="POST" action="/excluir/{{v[0]}}" style="display:inline;" onsubmit="return confirm('Excluir este registro?')">
                     <button class="excluir">Excluir</button>
                 </form>
             </td>
@@ -165,10 +163,21 @@ HTML = """
         {% endfor %}
     </table>
 </div>
+
+<script>
+// Splash
+window.onload = () => {
+  document.getElementById("splash").style.display = "none";
+};
+
+// Service Worker
+if ('serviceWorker' in navigator) {
+  navigator.serviceWorker.register('/static/sw.js');
+}
+</script>
+
 </body>
 </html>
-<link rel="manifest" href="/manifest.json">
-<meta name="theme-color" content="#1e1e2f">
 """
 
 # ----------------------
@@ -242,6 +251,11 @@ def excluir(id):
     return redirect("/")
 
 
+@app.route("/manifest.json")
+def manifest():
+    return send_file("manifest.json")
+
+
 # ----------------------
 # EXECUÇÃO
 # ----------------------
@@ -250,8 +264,3 @@ if __name__ == "__main__":
     criar_tabela()
     port = int(os.environ.get("PORT", 5000))
     app.run(host="0.0.0.0", port=port)
-from flask import send_file
-
-@app.route("/manifest.json")
-def manifest():
-    return send_file("manifest.json")
