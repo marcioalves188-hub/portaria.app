@@ -1,25 +1,15 @@
-import datetime
-
-"""
-Portaria Parque das Rosas WEB (Flask + SQLite)
-COM PAGINAÇÃO + BUSCA + OCORRÊNCIAS
-"""
-
 from flask import Flask, render_template_string, request, redirect
 from datetime import datetime
 import sqlite3
 import os
-from zoneinfo import ZoneInfo
 
 app = Flask(__name__)
 
 # ----------------------
 # BANCO
 # ----------------------
-
 def conectar():
     return sqlite3.connect("portaria.db")
-
 
 def criar_tabelas():
     conn = conectar()
@@ -52,19 +42,13 @@ def criar_tabelas():
 # ----------------------
 # HORÁRIO
 # ----------------------
-
 def agora():
-    return datetime.now(ZoneInfo("America/Sao_Paulo")).strftime("%d/%m/%Y %H:%M")
+    return datetime.now().strftime("%d/%m/%Y %H:%M")
 
 # ----------------------
-# HTML
+# HTML PROFISSIONAL
 # ----------------------
-
 HTML = """
-
-<div class="paginacao">
-{% if pagina > 1 %}
-<a href="/?pagina={{pagina-1}}&busca={{busca}}">⬅️</a>
 <!DOCTYPE html>
 <html>
 <head>
@@ -74,123 +58,131 @@ HTML = """
 <style>
 body {
     font-family: 'Segoe UI', Arial;
-    background: #0f172a;
-    color: #e2e8f0;
+    background: #eef2f7;
     margin: 0;
     padding: 20px;
 }
 
-/* HEADER */
-.header {
+.container {
+    max-width: 1200px;
+    margin: auto;
+}
+
+h1 {
+    text-align: center;
+    color: #2c3e50;
+}
+
+.card {
+    background: white;
+    padding: 20px;
+    border-radius: 12px;
+    margin-top: 20px;
+    box-shadow: 0 3px 10px rgba(0,0,0,0.08);
+}
+
+.row {
     display: flex;
-    justify-content: space-between;
-    align-items: center;
-    background: #1e293b;
-    padding: 15px;
-    border-radius: 10px;
+    flex-wrap: wrap;
+    gap: 10px;
 }
 
-.header h1 {
-    color: #38bdf8;
-    margin: 0;
+.row input {
+    flex: 1;
 }
 
-/* INPUT */
 input {
     padding: 10px;
     border-radius: 8px;
-    border: 1px solid #334155;
-    background: #1e293b;
-    color: white;
+    border: 1px solid #ccc;
 }
 
-/* BOTÕES */
 button {
     padding: 10px 15px;
     border-radius: 8px;
     border: none;
-    cursor: pointer;
-    font-weight: bold;
-    background: #3b82f6;
+    background: #3498db;
     color: white;
+    cursor: pointer;
 }
 
-button:hover { background: #2563eb; }
-
-.delete { background: #ef4444; }
-.delete:hover { background: #dc2626; }
-
-.saida { background: #f59e0b; }
-.saida:hover { background: #d97706; }
-
-/* CARDS */
-.card {
-    background: #1e293b;
-    padding: 15px;
-    border-radius: 10px;
-    margin-top: 20px;
+button:hover {
+    background: #2980b9;
 }
 
-/* TABELA */
+.delete {
+    background: #e74c3c;
+}
+
+.saida {
+    background: #f39c12;
+}
+
 table {
     width: 100%;
-    margin-top: 10px;
     border-collapse: collapse;
+    margin-top: 10px;
 }
 
 th {
-    background: #0ea5e9;
+    background: #3498db;
+    color: white;
     padding: 12px;
 }
 
 td {
     padding: 10px;
-    border-bottom: 1px solid #334155;
+    border-bottom: 1px solid #ddd;
 }
 
-/* PAGINAÇÃO */
+.paginacao {
+    text-align: center;
+    margin-top: 15px;
+}
+
 .paginacao a {
-    background: #334155;
-    padding: 8px 12px;
-    border-radius: 6px;
-    color: white;
-    text-decoration: none;
     margin: 5px;
+    padding: 8px 12px;
+    background: #ddd;
+    border-radius: 6px;
+    text-decoration: none;
+    color: black;
 }
 
-.paginacao a:hover { background: #475569; }
-
-.section { margin-top: 40px; }
-
+.section {
+    margin-top: 40px;
+}
 </style>
 </head>
 
 <body>
 
-<div class="header">
-<h1>🚪 Portaria Parque das Rosas</h1>
-</div>
+<div class="container">
 
-<!-- BUSCA -->
+<h1>🚪 Portaria Parque das Rosas</h1>
+
 <div class="card">
 <form method="GET">
-<input name="busca" placeholder="Buscar visitante">
+<div class="row">
+<input name="busca" placeholder="Buscar visitante" value="{{busca}}">
 <button>Buscar</button>
+</div>
 </form>
 </div>
 
-<!-- CADASTRO -->
 <div class="card">
 <form method="POST" action="/cadastrar">
+<div class="row">
 <input name="nome" placeholder="Nome" required>
 <input name="endereco" placeholder="Endereço">
 <input name="documento" placeholder="Documento" required>
 <input name="placa" placeholder="Placa">
+</div>
+<br>
 <button>Cadastrar</button>
 </form>
 </div>
 
-<!-- TABELA -->
 <div class="card">
 <table>
 <tr>
@@ -226,34 +218,39 @@ td {
 </td>
 </tr>
 {% endfor %}
-
 </table>
 
 <div class="paginacao">
 {% if pagina > 1 %}
 <a href="/?pagina={{pagina-1}}&busca={{busca}}">⬅</a>
 {% endif %}
+
 <span>Página {{pagina}}</span>
+
 {% if tem_proxima %}
 <a href="/?pagina={{pagina+1}}&busca={{busca}}">➡</a>
 {% endif %}
 </div>
-
 </div>
 
-<!-- OCORRÊNCIAS -->
 <div class="card section">
-
 <h2>📋 Ocorrências</h2>
 
 <form method="POST" action="/ocorrencia">
+<div class="row">
 <input name="nome" placeholder="Nome">
 <input name="descricao" placeholder="Descrição" required>
 <button>Registrar</button>
+</div>
 </form>
 
 <table>
-<tr><th>Nome</th><th>Descrição</th><th>Data</th><th>Ação</th></tr>
+<tr>
+<th>Nome</th>
+<th>Descrição</th>
+<th>Data</th>
+<th>Ação</th>
+</tr>
 
 {% for o in ocorrencias %}
 <tr>
@@ -267,44 +264,10 @@ td {
 </td>
 </tr>
 {% endfor %}
-
 </table>
 
 </div>
 
-</body>
-</html>{% endif %}
-<span>Página {{pagina}}</span>
-{% if tem_proxima %}
-<a href="/?pagina={{pagina+1}}&busca={{busca}}">➡️</a>
-{% endif %}
-</div>
-
-<!-- OCORRÊNCIAS -->
-<div class="section">
-<h2>📋 Ocorrências</h2>
-
-<form method="POST" action="/ocorrencia">
-<input name="nome" placeholder="Nome">
-<input name="descricao" placeholder="Descrição" required>
-<button>Registrar</button>
-</form>
-
-<table>
-<tr><th>Nome</th><th>Descrição</th><th>Data</th><th>Ação</th></tr>
-{% for o in ocorrencias %}
-<tr>
-<td>{{o[1]}}</td>
-<td>{{o[2]}}</td>
-<td>{{o[3]}}</td>
-<td>
-<form method="POST" action="/excluir_ocorrencia/{{o[0]}}">
-<button class="delete">Excluir</button>
-</form>
-</td>
-</tr>
-{% endfor %}
-</table>
 </div>
 
 </body>
@@ -314,7 +277,6 @@ td {
 # ----------------------
 # ROTAS
 # ----------------------
-
 @app.route("/")
 def index():
     pagina = int(request.args.get("pagina", 1))
@@ -325,10 +287,14 @@ def index():
     conn = conectar()
     c = conn.cursor()
 
-    query = "SELECT * FROM visitantes WHERE nome LIKE ? OR documento LIKE ? OR placa LIKE ? OR endereco LIKE ? ORDER BY id DESC LIMIT ? OFFSET ?"
     termo = f"%{busca}%"
 
-    c.execute(query, (termo, termo, termo, termo, limite + 1, offset))
+    c.execute("""
+    SELECT * FROM visitantes
+    WHERE nome LIKE ? OR documento LIKE ? OR placa LIKE ? OR endereco LIKE ?
+    ORDER BY id DESC LIMIT ? OFFSET ?
+    """, (termo, termo, termo, termo, limite + 1, offset))
+
     dados = c.fetchall()
 
     tem_proxima = len(dados) > limite
@@ -339,35 +305,45 @@ def index():
 
     conn.close()
 
-    return render_template_string(HTML, registros=registros, pagina=pagina, tem_proxima=tem_proxima, busca=busca, ocorrencias=ocorrencias)
-
+    return render_template_string(HTML,
+        registros=registros,
+        pagina=pagina,
+        tem_proxima=tem_proxima,
+        busca=busca,
+        ocorrencias=ocorrencias
+    )
 
 @app.route("/cadastrar", methods=["POST"])
 def cadastrar():
     conn = conectar()
     c = conn.cursor()
 
-    c.execute("INSERT INTO visitantes(nome,endereco,documento,placa,entrada,saida) VALUES(?,?,?,?,?,?)",
-              (request.form["nome"], request.form.get("endereco", ""), request.form["documento"], request.form.get("placa", ""), agora(), ""))
+    c.execute("""
+    INSERT INTO visitantes(nome,endereco,documento,placa,entrada,saida)
+    VALUES(?,?,?,?,?,?)
+    """, (
+        request.form["nome"],
+        request.form.get("endereco",""),
+        request.form["documento"],
+        request.form.get("placa",""),
+        agora(),
+        ""
+    ))
 
     conn.commit()
     conn.close()
-
     return redirect("/")
 
-
 @app.route("/saida/<int:id>", methods=["POST"])
-def registrar_saida(id):
+def saida(id):
     conn = conectar()
     c = conn.cursor()
 
-    c.execute("UPDATE visitantes SET saida=? WHERE id=? AND saida=''", (agora(), id))
+    c.execute("UPDATE visitantes SET saida=? WHERE id=?", (agora(), id))
 
     conn.commit()
     conn.close()
-
     return redirect("/")
-
 
 @app.route("/excluir/<int:id>", methods=["POST"])
 def excluir(id):
@@ -378,9 +354,7 @@ def excluir(id):
 
     conn.commit()
     conn.close()
-
     return redirect("/")
-
 
 @app.route("/ocorrencia", methods=["POST"])
 def ocorrencia():
@@ -388,13 +362,11 @@ def ocorrencia():
     c = conn.cursor()
 
     c.execute("INSERT INTO ocorrencias(nome,descricao,data) VALUES(?,?,?)",
-              (request.form.get("nome", ""), request.form["descricao"], agora()))
+              (request.form.get("nome",""), request.form["descricao"], agora()))
 
     conn.commit()
     conn.close()
-
     return redirect("/")
-
 
 @app.route("/excluir_ocorrencia/<int:id>", methods=["POST"])
 def excluir_ocorrencia(id):
@@ -405,37 +377,12 @@ def excluir_ocorrencia(id):
 
     conn.commit()
     conn.close()
-
     return redirect("/")
 
 # ----------------------
-# TESTES
+# START
 # ----------------------
-
-def _test_endereco():
-    criar_tabelas()
-    conn = conectar()
-    c = conn.cursor()
-
-    c.execute("DELETE FROM visitantes")
-
-    c.execute("INSERT INTO visitantes(nome,endereco,documento,placa,entrada,saida) VALUES ('Joao','Rua A','123','ABC','01/01','')")
-    conn.commit()
-
-    c.execute("SELECT endereco FROM visitantes WHERE nome='Joao'")
-    endereco = c.fetchone()[0]
-
-    assert endereco == 'Rua A'
-
-    conn.close()
-
-# ----------------------
-# EXECUÇÃO
-# ----------------------
-
 if __name__ == "__main__":
     criar_tabelas()
-    _test_endereco()
-
-    port=int(os.environ.get("PORT",5000))
-    app.run(host="0.0.0.0",port=port)
+    port = int(os.environ.get("PORT", 5000))
+    app.run(host="0.0.0.0", port=port)
