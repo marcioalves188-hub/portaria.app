@@ -61,34 +61,126 @@ def agora():
 # ----------------------
 
 HTML = """
+
+<div class="paginacao">
+{% if pagina > 1 %}
+<a href="/?pagina={{pagina-1}}&busca={{busca}}">⬅️</a>
 <!DOCTYPE html>
 <html>
 <head>
 <title>Portaria Parque das Rosas</title>
 <meta name="viewport" content="width=device-width, initial-scale=1">
+
 <style>
-body{font-family:Arial;background:#1e1e2f;color:white;text-align:center}
-input,button{padding:10px;border-radius:8px;border:none;margin:5px}
-button{background:#4CAF50;color:white}
-.delete{background:#f44336}
-.saida{background:#ff9800}
-table{width:100%;margin-top:20px;background:#2e2e3e}
-th,td{padding:10px}
-.paginacao a{color:white;margin:5px;text-decoration:none}
-.section{margin-top:40px}
+body {
+    font-family: 'Segoe UI', Arial;
+    background: #0f172a;
+    color: #e2e8f0;
+    margin: 0;
+    padding: 20px;
+}
+
+/* HEADER */
+.header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 10px;
+}
+
+.header h1 {
+    color: #38bdf8;
+    margin: 0;
+}
+
+/* INPUT */
+input {
+    padding: 10px;
+    border-radius: 8px;
+    border: 1px solid #334155;
+    background: #1e293b;
+    color: white;
+}
+
+/* BOTÕES */
+button {
+    padding: 10px 15px;
+    border-radius: 8px;
+    border: none;
+    cursor: pointer;
+    font-weight: bold;
+    background: #3b82f6;
+    color: white;
+}
+
+button:hover { background: #2563eb; }
+
+.delete { background: #ef4444; }
+.delete:hover { background: #dc2626; }
+
+.saida { background: #f59e0b; }
+.saida:hover { background: #d97706; }
+
+/* CARDS */
+.card {
+    background: #1e293b;
+    padding: 15px;
+    border-radius: 10px;
+    margin-top: 20px;
+}
+
+/* TABELA */
+table {
+    width: 100%;
+    margin-top: 10px;
+    border-collapse: collapse;
+}
+
+th {
+    background: #0ea5e9;
+    padding: 12px;
+}
+
+td {
+    padding: 10px;
+    border-bottom: 1px solid #334155;
+}
+
+/* PAGINAÇÃO */
+.paginacao a {
+    background: #334155;
+    padding: 8px 12px;
+    border-radius: 6px;
+    color: white;
+    text-decoration: none;
+    margin: 5px;
+}
+
+.paginacao a:hover { background: #475569; }
+
+.section { margin-top: 40px; }
+
 </style>
 </head>
+
 <body>
 
+<div class="header">
 <h1>🚪 Portaria Parque das Rosas</h1>
+</div>
 
 <!-- BUSCA -->
-<form method="GET" action="/">
-<input name="busca" placeholder="Buscar nome/documento/placa/endereço">
+<div class="card">
+<form method="GET">
+<input name="busca" placeholder="Buscar visitante">
 <button>Buscar</button>
 </form>
+</div>
 
 <!-- CADASTRO -->
+<div class="card">
 <form method="POST" action="/cadastrar">
 <input name="nome" placeholder="Nome" required>
 <input name="endereco" placeholder="Endereço">
@@ -96,10 +188,21 @@ th,td{padding:10px}
 <input name="placa" placeholder="Placa">
 <button>Cadastrar</button>
 </form>
+</div>
 
-<!-- TABELA VISITANTES -->
+<!-- TABELA -->
+<div class="card">
 <table>
-<tr><th>Nome</th><th>Endereço</th><th>Documento</th><th>Placa</th><th>Entrada</th><th>Saída</th><th>Ações</th></tr>
+<tr>
+<th>Nome</th>
+<th>Endereço</th>
+<th>Documento</th>
+<th>Placa</th>
+<th>Entrada</th>
+<th>Saída</th>
+<th>Ações</th>
+</tr>
+
 {% for v in registros %}
 <tr>
 <td>{{v[1]}}</td>
@@ -109,23 +212,68 @@ th,td{padding:10px}
 <td>{{v[5]}}</td>
 <td>{{v[6]}}</td>
 <td>
+
 {% if not v[6] %}
 <form method="POST" action="/saida/{{v[0]}}" style="display:inline">
 <button class="saida">Saída</button>
 </form>
 {% endif %}
+
 <form method="POST" action="/excluir/{{v[0]}}" style="display:inline">
+<button class="delete">Excluir</button>
+</form>
+
+</td>
+</tr>
+{% endfor %}
+
+</table>
+
+<div class="paginacao">
+{% if pagina > 1 %}
+<a href="/?pagina={{pagina-1}}&busca={{busca}}">⬅</a>
+{% endif %}
+<span>Página {{pagina}}</span>
+{% if tem_proxima %}
+<a href="/?pagina={{pagina+1}}&busca={{busca}}">➡</a>
+{% endif %}
+</div>
+
+</div>
+
+<!-- OCORRÊNCIAS -->
+<div class="card section">
+
+<h2>📋 Ocorrências</h2>
+
+<form method="POST" action="/ocorrencia">
+<input name="nome" placeholder="Nome">
+<input name="descricao" placeholder="Descrição" required>
+<button>Registrar</button>
+</form>
+
+<table>
+<tr><th>Nome</th><th>Descrição</th><th>Data</th><th>Ação</th></tr>
+
+{% for o in ocorrencias %}
+<tr>
+<td>{{o[1]}}</td>
+<td>{{o[2]}}</td>
+<td>{{o[3]}}</td>
+<td>
+<form method="POST" action="/excluir_ocorrencia/{{o[0]}}">
 <button class="delete">Excluir</button>
 </form>
 </td>
 </tr>
 {% endfor %}
+
 </table>
 
-<div class="paginacao">
-{% if pagina > 1 %}
-<a href="/?pagina={{pagina-1}}&busca={{busca}}">⬅️</a>
-{% endif %}
+</div>
+
+</body>
+</html>{% endif %}
 <span>Página {{pagina}}</span>
 {% if tem_proxima %}
 <a href="/?pagina={{pagina+1}}&busca={{busca}}">➡️</a>
