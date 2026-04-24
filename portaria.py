@@ -1,279 +1,184 @@
-from flask import Flask, render_template_string, request, redirect
+from flask import Flask, render_template_string, request, redirect, session, send_file
 from datetime import datetime
 import sqlite3
 import os
+import csv
 
 app = Flask(__name__)
+app.secret_key = "portaria_super_segura"
 
-# ----------------------
+DB = "portaria.db"
+UPLOAD = "static/fotos"
+
+if not os.path.exists(UPLOAD):
+    os.makedirs(UPLOAD)
+
+# -------------------------
 # BANCO
-# ----------------------
+# -------------------------
 def conectar():
-    return sqlite3.connect("portaria.db")
+    return sqlite3.connect(DB)
 
-def criar_tabelas():
+def criar():
     conn = conectar()
     c = conn.cursor()
 
     c.execute("""
+    CREATE TABLE IF NOT EXISTS usuarios (
+        id INTEGER PRIMARY KEY,
+        user TEXT,
+        senha TEXT
+    )
+    """)
+
+    c.execute("""
     CREATE TABLE IF NOT EXISTS visitantes (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        id INTEGER PRIMARY KEY,
         nome TEXT,
-        endereco TEXT,
         documento TEXT,
         placa TEXT,
+        foto TEXT,
         entrada TEXT,
         saida TEXT
     )
     """)
 
-    c.execute("""
-    CREATE TABLE IF NOT EXISTS ocorrencias (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        nome TEXT,
-        descricao TEXT,
-        data TEXT
-    )
-    """)
+    # usuário padrão
+    c.execute("SELECT * FROM usuarios")
+    if not c.fetchall():
+        c.execute("INSERT INTO usuarios VALUES (1,'admin','123')")
 
     conn.commit()
     conn.close()
 
-# ----------------------
-# HORÁRIO
-# ----------------------
-def agora():
-    return datetime.now().strftime("%d/%m/%Y %H:%M")
+# -------------------------
+# LOGIN
+# -------------------------
+@app.route("/login", methods=["GET","POST"])
+def login():
+    if request.method == "POST":
+        user = request.form["user"]
+        senha = request.form["senha"]
 
-# ----------------------
-# HTML PROFISSIONAL
-# ----------------------
-HTML = """
-<!DOCTYPE html>
-<html>
-<head>
-<title>Portaria</title>
-<meta name="viewport" content="width=device-width, initial-scale=1">
-<style>
-body {font-family: Arial; background:#f5f6fa; margin:0;}
-.container {max-width:1200px; margin:auto; padding:20px;}
-h1 {text-align:center; color:#2c3e50;}
-.card {background:white; padding:20px; border-radius:10px; margin-top:20px; box-shadow:0 2px 8px rgba(0,0,0,0.1);}
-input {padding:10px; margin:5px; border-radius:6px; border:1px solid #ccc;}
-button {padding:10px 15px; border:none; border-radius:6px; background:#3498db; color:white; cursor:pointer;}
-button:hover {background:#2980b9;}
-.delete {background:#e74c3c;}
-.saida {background:#f39c12;}
-table {width:100%; border-collapse:collapse; margin-top:10px;}
-th {background:#3498db; color:white; padding:10px;}
-td {padding:8px; border-bottom:1px solid #ddd;}
-.paginacao {text-align:center; margin-top:10px;}
-.paginacao a {margin:5px; text-decoration:none; background:#ddd; padding:5px 10px; border-radius:5px;}
-</style>
-</head>
-<body>
+        conn = conectar()
+        c = conn.cursor()
+        c.execute("SELECT * FROM usuarios WHERE user=? AND senha=?", (user, senha))
 
-<div class="container">
+        if c.fetchone():
+            session["logado"] = True
+            return redirect("/")
+        else:
+            return "Login inválido"
 
-<h1>🚪 Controle de Portaria</h1>
+    return """
+    <h2>Login Portaria</h2>
+    <form method="POST">
+    <input name="user" placeholder="Usuário"><br>
+    <input name="senha" type="password" placeholder="Senha"><br>
+    <button>Entrar</button>
+    </form>
+    """
 
-<div class="card">
-<form method="GET">
-<input name="busca" placeholder="Buscar..." value="{{busca}}">
-<button>Buscar</button>
-</form>
-</div>
+@app.route("/logout")
+def logout():
+    session.clear()
+    return redirect("/login")
 
-<div class="card">
-<form method="POST" action="/cadastrar">
-<input name="nome" placeholder="Nome" required>
-<input name="endereco" placeholder="Endereço">
-<input name="documento" placeholder="Documento" required>
-<input name="placa" placeholder="Placa">
-<button>Cadastrar</button>
-</form>
-</div>
-
-<div class="card">
-<table>
-<tr>
-<th>Nome</th><th>Endereço</th><th>Documento</th><th>Placa</th><th>Entrada</th><th>Saída</th><th>Ações</th>
-</tr>
-
-{% for v in registros %}
-<tr>
-<td>{{v[1]}}</td>
-<td>{{v[2]}}</td>
-<td>{{v[3]}}</td>
-<td>{{v[4]}}</td>
-<td>{{v[5]}}</td>
-<td>{{v[6]}}</td>
-<td>
-
-{% if not v[6] %}
-<form method="POST" action="/saida/{{v[0]}}" style="display:inline">
-<button class="saida">Saída</button>
-</form>
-{% endif %}
-
-<form method="POST" action="/excluir/{{v[0]}}" style="display:inline">
-<button class="delete">Excluir</button>
-</form>
-
-</td>
-</tr>
-{% endfor %}
-</table>
-
-<div class="paginacao">
-{% if pagina > 1 %}
-<a href="/?pagina={{pagina-1}}&busca={{busca}}">⬅</a>
-{% endif %}
-
-<span>Página {{pagina}}</span>
-
-{% if tem_proxima %}
-<a href="/?pagina={{pagina+1}}&busca={{busca}}">➡</a>
-{% endif %}
-</div>
-
-</div>
-
-<div class="card">
-<h2>📋 Ocorrências</h2>
-
-<form method="POST" action="/ocorrencia">
-<input name="nome" placeholder="Nome">
-<input name="descricao" placeholder="Descrição" required>
-<button>Registrar</button>
-</form>
-
-<table>
-<tr><th>Nome</th><th>Descrição</th><th>Data</th><th>Ação</th></tr>
-
-{% for o in ocorrencias %}
-<tr>
-<td>{{o[1]}}</td>
-<td>{{o[2]}}</td>
-<td>{{o[3]}}</td>
-<td>
-<form method="POST" action="/excluir_ocorrencia/{{o[0]}}">
-<button class="delete">Excluir</button>
-</form>
-</td>
-</tr>
-{% endfor %}
-</table>
-
-</div>
-
-</div>
-</body>
-</html>
-"""
-
-# ----------------------
-# ROTAS
-# ----------------------
+# -------------------------
+# HOME
+# -------------------------
 @app.route("/")
 def index():
-    pagina = int(request.args.get("pagina", 1))
-    busca = request.args.get("busca", "")
-    limite = 10
-    offset = (pagina - 1) * limite
+    if not session.get("logado"):
+        return redirect("/login")
 
     conn = conectar()
-    c = conn.cursor()
+    dados = conn.execute("SELECT * FROM visitantes ORDER BY id DESC").fetchall()
 
-    termo = f"%{busca}%"
+    return render_template_string("""
+    <h1>🚪 Portaria Profissional</h1>
 
-    c.execute("""
-    SELECT * FROM visitantes
-    WHERE nome LIKE ? OR documento LIKE ? OR placa LIKE ? OR endereco LIKE ?
-    ORDER BY id DESC LIMIT ? OFFSET ?
-    """, (termo, termo, termo, termo, limite+1, offset))
+    <a href="/logout">Sair</a> |
+    <a href="/exportar">Exportar</a>
 
-    dados = c.fetchall()
-    tem_proxima = len(dados) > limite
-    registros = dados[:limite]
+    <h2>Novo Visitante</h2>
+    <form method="POST" action="/add" enctype="multipart/form-data">
+    <input name="nome" placeholder="Nome" required>
+    <input name="documento" placeholder="Documento">
+    <input name="placa" placeholder="Placa">
+    <input type="file" name="foto">
+    <button>Cadastrar</button>
+    </form>
 
-    c.execute("SELECT * FROM ocorrencias ORDER BY id DESC")
-    ocorrencias = c.fetchall()
+    <table border=1>
+    <tr><th>Nome</th><th>Doc</th><th>Placa</th><th>Foto</th><th>Entrada</th><th>Saída</th></tr>
 
-    conn.close()
+    {% for v in dados %}
+    <tr>
+    <td>{{v[1]}}</td>
+    <td>{{v[2]}}</td>
+    <td>{{v[3]}}</td>
+    <td>
+    {% if v[4] %}
+        <img src="/static/fotos/{{v[4]}}" width="60">
+    {% endif %}
+    </td>
+    <td>{{v[5]}}</td>
+    <td>{{v[6]}}</td>
+    </tr>
+    {% endfor %}
+    </table>
+    """, dados=dados)
 
-    return render_template_string(HTML, registros=registros,
-                                 pagina=pagina, tem_proxima=tem_proxima,
-                                 busca=busca, ocorrencias=ocorrencias)
+# -------------------------
+# CADASTRO
+# -------------------------
+@app.route("/add", methods=["POST"])
+def add():
+    if not session.get("logado"):
+        return redirect("/login")
 
-@app.route("/cadastrar", methods=["POST"])
-def cadastrar():
+    nome = request.form["nome"]
+    doc = request.form.get("documento","")
+    placa = request.form.get("placa","")
+
+    foto_nome = ""
+    foto = request.files.get("foto")
+
+    if foto and foto.filename:
+        foto_nome = f"{datetime.now().timestamp()}.jpg"
+        foto.save(os.path.join(UPLOAD, foto_nome))
+
     conn = conectar()
-    c = conn.cursor()
-
-    c.execute("INSERT INTO visitantes VALUES (NULL,?,?,?,?,?,?)",
-              (request.form["nome"],
-               request.form.get("endereco",""),
-               request.form["documento"],
-               request.form.get("placa",""),
-               agora(), ""))
+    conn.execute("""
+    INSERT INTO visitantes (nome,documento,placa,foto,entrada,saida)
+    VALUES (?,?,?,?,?,?)
+    """, (nome, doc, placa, foto_nome, datetime.now(), ""))
 
     conn.commit()
-    conn.close()
     return redirect("/")
 
-@app.route("/saida/<int:id>", methods=["POST"])
-def saida(id):
+# -------------------------
+# EXPORTAR CSV
+# -------------------------
+@app.route("/exportar")
+def exportar():
     conn = conectar()
-    c = conn.cursor()
+    dados = conn.execute("SELECT * FROM visitantes").fetchall()
 
-    c.execute("UPDATE visitantes SET saida=? WHERE id=? AND saida=''",
-              (agora(), id))
+    arquivo = "relatorio.csv"
 
-    conn.commit()
-    conn.close()
-    return redirect("/")
+    with open(arquivo, "w", newline="", encoding="utf-8") as f:
+        writer = csv.writer(f)
+        writer.writerow(["Nome","Documento","Placa","Entrada","Saída"])
+        for d in dados:
+            writer.writerow([d[1], d[2], d[3], d[5], d[6]])
 
-@app.route("/excluir/<int:id>", methods=["POST"])
-def excluir(id):
-    conn = conectar()
-    c = conn.cursor()
+    return send_file(arquivo, as_attachment=True)
 
-    c.execute("DELETE FROM visitantes WHERE id=?", (id,))
-
-    conn.commit()
-    conn.close()
-    return redirect("/")
-
-@app.route("/ocorrencia", methods=["POST"])
-def ocorrencia():
-    conn = conectar()
-    c = conn.cursor()
-
-    c.execute("INSERT INTO ocorrencias VALUES (NULL,?,?,?)",
-              (request.form.get("nome",""),
-               request.form["descricao"],
-               agora()))
-
-    conn.commit()
-    conn.close()
-    return redirect("/")
-
-@app.route("/excluir_ocorrencia/<int:id>", methods=["POST"])
-def excluir_ocorrencia(id):
-    conn = conectar()
-    c = conn.cursor()
-
-    c.execute("DELETE FROM ocorrencias WHERE id=?", (id,))
-
-    conn.commit()
-    conn.close()
-    return redirect("/")
-
-# ----------------------
+# -------------------------
 # START
-# ----------------------
+# -------------------------
 if __name__ == "__main__":
-    criar_tabelas()
-    port = int(os.environ.get("PORT", 5000))
-    app.run(host="0.0.0.0", port=port)
+    criar()
+    app.run(debug=True)
