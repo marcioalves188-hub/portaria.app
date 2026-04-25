@@ -13,13 +13,13 @@ UPLOAD = "static/fotos"
 if not os.path.exists(UPLOAD):
     os.makedirs(UPLOAD)
 
-# -------------------------
+# ----------------------
 # BANCO
-# -------------------------
+# ----------------------
 def conectar():
     return sqlite3.connect(DB)
 
-def criar():
+def criar_tabelas():
     conn = conectar()
     c = conn.cursor()
 
@@ -33,13 +33,22 @@ def criar():
 
     c.execute("""
     CREATE TABLE IF NOT EXISTS visitantes (
-        id INTEGER PRIMARY KEY,
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
         nome TEXT,
         documento TEXT,
         placa TEXT,
         foto TEXT,
         entrada TEXT,
         saida TEXT
+    )
+    """)
+
+    c.execute("""
+    CREATE TABLE IF NOT EXISTS ocorrencias (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        nome TEXT,
+        descricao TEXT,
+        data TEXT
     )
     """)
 
@@ -51,9 +60,13 @@ def criar():
     conn.commit()
     conn.close()
 
-# -------------------------
+# ----------------------
+def agora():
+    return datetime.now().strftime("%d/%m/%Y %H:%M")
+
+# ----------------------
 # LOGIN
-# -------------------------
+# ----------------------
 @app.route("/login", methods=["GET","POST"])
 def login():
     if request.method == "POST":
@@ -84,9 +97,9 @@ def logout():
     session.clear()
     return redirect("/login")
 
-# -------------------------
+# ----------------------
 # HOME
-# -------------------------
+# ----------------------
 @app.route("/")
 def index():
     if not session.get("logado"):
@@ -94,15 +107,17 @@ def index():
 
     conn = conectar()
     dados = conn.execute("SELECT * FROM visitantes ORDER BY id DESC").fetchall()
+    ocorrencias = conn.execute("SELECT * FROM ocorrencias ORDER BY id DESC").fetchall()
+    conn.close()
 
     return render_template_string("""
     <h1>🚪 Portaria Profissional</h1>
 
     <a href="/logout">Sair</a> |
-    <a href="/exportar">Exportar</a>
+    <a href="/exportar">Exportar CSV</a>
 
     <h2>Novo Visitante</h2>
-    <form method="POST" action="/add" enctype="multipart/form-data">
+    <form method="POST" action="/cadastrar" enctype="multipart/form-data">
     <input name="nome" placeholder="Nome" required>
     <input name="documento" placeholder="Documento">
     <input name="placa" placeholder="Placa">
@@ -111,7 +126,7 @@ def index():
     </form>
 
     <table border=1>
-    <tr><th>Nome</th><th>Doc</th><th>Placa</th><th>Foto</th><th>Entrada</th><th>Saída</th></tr>
+    <tr><th>Nome</th><th>Doc</th><th>Placa</th><th>Foto</th><th>Entrada</th><th>Saída</th><th>Ações</th></tr>
 
     {% for v in dados %}
     <tr>
@@ -125,16 +140,50 @@ def index():
     </td>
     <td>{{v[5]}}</td>
     <td>{{v[6]}}</td>
+    <td>
+        {% if not v[6] %}
+        <form method="POST" action="/saida/{{v[0]}}" style="display:inline">
+            <button>Saída</button>
+        </form>
+        {% endif %}
+        <form method="POST" action="/excluir/{{v[0]}}" style="display:inline">
+            <button>Excluir</button>
+        </form>
+    </td>
     </tr>
     {% endfor %}
     </table>
-    """, dados=dados)
 
-# -------------------------
+    <h2>📋 Ocorrências</h2>
+
+    <form method="POST" action="/ocorrencia">
+    <input name="nome" placeholder="Nome">
+    <input name="descricao" placeholder="Descrição" required>
+    <button>Registrar</button>
+    </form>
+
+    <table border=1>
+    <tr><th>Nome</th><th>Descrição</th><th>Data</th><th>Ação</th></tr>
+    {% for o in ocorrencias %}
+    <tr>
+    <td>{{o[1]}}</td>
+    <td>{{o[2]}}</td>
+    <td>{{o[3]}}</td>
+    <td>
+        <form method="POST" action="/excluir_ocorrencia/{{o[0]}}">
+        <button>Excluir</button>
+        </form>
+    </td>
+    </tr>
+    {% endfor %}
+    </table>
+    """, dados=dados, ocorrencias=ocorrencias)
+
+# ----------------------
 # CADASTRO
-# -------------------------
-@app.route("/add", methods=["POST"])
-def add():
+# ----------------------
+@app.route("/cadastrar", methods=["POST"])
+def cadastrar():
     if not session.get("logado"):
         return redirect("/login")
 
@@ -153,18 +202,39 @@ def add():
     conn.execute("""
     INSERT INTO visitantes (nome,documento,placa,foto,entrada,saida)
     VALUES (?,?,?,?,?,?)
-    """, (nome, doc, placa, foto_nome, datetime.now(), ""))
+    """, (nome, doc, placa, foto_nome, agora(), ""))
 
     conn.commit()
+    conn.close()
+
     return redirect("/")
 
-# -------------------------
+# ----------------------
+@app.route("/saida/<int:id>", methods=["POST"])
+def saida(id):
+    conn = conectar()
+    conn.execute("UPDATE visitantes SET saida=? WHERE id=?", (agora(), id))
+    conn.commit()
+    conn.close()
+    return redirect("/")
+
+# ----------------------
+@app.route("/excluir/<int:id>", methods=["POST"])
+def excluir(id):
+    conn = conectar()
+    conn.execute("DELETE FROM visitantes WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect("/")
+
+# ----------------------
 # EXPORTAR CSV
-# -------------------------
+# ----------------------
 @app.route("/exportar")
 def exportar():
     conn = conectar()
     dados = conn.execute("SELECT * FROM visitantes").fetchall()
+    conn.close()
 
     arquivo = "relatorio.csv"
 
@@ -176,9 +246,29 @@ def exportar():
 
     return send_file(arquivo, as_attachment=True)
 
-# -------------------------
-# START
-# -------------------------
+# ----------------------
+# OCORRÊNCIAS
+# ----------------------
+@app.route("/ocorrencia", methods=["POST"])
+def ocorrencia():
+    conn = conectar()
+    conn.execute("INSERT INTO ocorrencias VALUES (NULL,?,?,?)",
+                 (request.form.get("nome",""),
+                  request.form["descricao"],
+                  agora()))
+    conn.commit()
+    conn.close()
+    return redirect("/")
+
+@app.route("/excluir_ocorrencia/<int:id>", methods=["POST"])
+def excluir_ocorrencia(id):
+    conn = conectar()
+    conn.execute("DELETE FROM ocorrencias WHERE id=?", (id,))
+    conn.commit()
+    conn.close()
+    return redirect("/")
+
+# ----------------------
 if __name__ == "__main__":
-    criar()
+    criar_tabelas()
     app.run(debug=True)
